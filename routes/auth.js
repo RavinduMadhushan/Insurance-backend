@@ -7,7 +7,7 @@ const jwt = require("jsonwebtoken");
 const Joi = require("joi");
 
 router.post("/user", async (req, res) => {
-  console.log(req.body);
+  // console.log(req.body);
   const { error } = validate(req.body);
 
   if (error) {
@@ -17,6 +17,7 @@ router.post("/user", async (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
   let user;
+  let users;
 
   const salt = await bcrypt.genSalt(10);
   let upassword = await bcrypt.hash(password, salt);
@@ -25,26 +26,35 @@ router.post("/user", async (req, res) => {
     "SELECT * FROM users WHERE email = ?",
     [email],
     async function(err, result) {
-      user = result[0];
+      users = result[0];
       // console.log(user.password, upassword);
-      if (!user) {
+      if (!users) {
         return res.status(400).send("Invalid Email or Password");
       } else {
-        bcrypt.compare(password, user.password, function(err, response) {
+        bcrypt.compare(password, users.password, function(err, response) {
           // console.log(response);
           if (response == true) {
-            const token = jwt.sign(
-              {
-                id: user.id,
-                fullname: user.fullname,
-                email: user.email
-              },
-              "insurance",
-              { expiresIn: 60 * 60 * 24 }
-            );
+            connection.query(
+              "SELECT users.fullname,users.user_id, users.email,role.user FROM users INNER JOIN role ON users.role_id = role.role_id AND users.email =  ?",
+              [email],
+              async function(error, results) {
+                // console.log(results);
 
-            // console.log(token);
-            res.send({ token: token });
+                user = results[0];
+                const token = jwt.sign(
+                  {
+                    id: user.user_id,
+                    fullname: user.fullname,
+                    email: user.email,
+                    type: user.user
+                  },
+                  "insurance",
+                  { expiresIn: 60 * 60 * 24 }
+                );
+                // console.log(user);
+                res.send({ token: token });
+              }
+            );
           } else {
             return res.status(400).send("Invalidpassword.");
           }
